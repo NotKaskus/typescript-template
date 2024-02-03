@@ -1,0 +1,16 @@
+{
+    "extends": ["@sapphire"],
+    "plugins": ["deprecation"],
+    "rules": {
+      "@typescript-eslint/unified-signatures": "off",
+      "deprecation/deprecation": "warn"
+    },
+    "overrides": [
+      {
+        "files": ["vitest.config.ts"],
+        "rules": {
+          "spaced-comment": "off"
+        }
+      }
+    ]
+  }

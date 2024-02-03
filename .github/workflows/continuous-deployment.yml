@@ -1,0 +1,106 @@
+name: Continuous Deployment
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  CreateTag:
+    name: Create a tag on GitHub
+    runs-on: ubuntu-latest
+    outputs:
+      release_body: ${{ steps.get_release_notes.outputs.content }}
+      release_version: ${{ steps.get_version.outputs.VERSION }}
+    steps:
+      - name: Checkout Project
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Use Node.js v20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+      - name: Install Dependencies
+        run: bun install
+      - name: Configure Git
+        run: |
+          git config --global user.name "${GITHUB_USER}"
+          git config --global user.email "${GITHUB_EMAIL}"
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_USER: NotKaskus
+          GITHUB_EMAIL: andrewonrubia@gmail.com
+      - name: Set up git-cliff
+        uses: kenji-miyake/setup-git-cliff@v1
+      - name: Bump semver
+        run: bun run bump
+        env:
+          CI: false
+      - name: Get version from package.json
+        id: get_version
+        run: echo ::set-output name=VERSION::$(node -p "require('./package.json').version")
+      - name: Store bumped package.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: package_bundle
+          path: package.json
+          if-no-files-found: error
+      - name: Store bumped changelog.md
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog_bundle
+          path: CHANGELOG.md
+          if-no-files-found: error
+      - name: Get release notes
+        uses: orhun/git-cliff-action@v2
+        id: get_release_notes
+        with:
+          args: --verbose --latest --strip header --tag ${{ steps.get_version.outputs.VERSION }}
+        env:
+          OUTPUT: CHANGES.md
+      - name: Push changes
+        run: git push origin main && git push --tags origin main
+
+  Release:
+    name: Release
+    needs: CreateTag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Project
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download latest package.json
+        uses: actions/download-artifact@v4
+        with:
+          name: package_bundle
+          path: .
+      - name: Print Release notes
+        run: echo "${{ needs.CreateTag.outputs.release_body }}"
+      - name: Create Pre-Release
+        uses: softprops/action-gh-release@v1
+        if: ${{ contains(github.event.pull_request.title, '[pre-release]') }}
+        with:
+          tag_name: ${{ needs.CreateTag.outputs.release_version }}
+          name: Release ${{ needs.CreateTag.outputs.release_version }}
+          body: ${{ needs.CreateTag.outputs.release_body }}
+          draft: false
+          prerelease: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: ${{ !contains(github.event.pull_request.title, '[pre-release]') }}
+        with:
+          tag_name: ${{ needs.CreateTag.outputs.release_version }}
+          name: 'v${{ needs.CreateTag.outputs.release_version }}'
+          body: ${{ needs.CreateTag.outputs.release_body }}
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}

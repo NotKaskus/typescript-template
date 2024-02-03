@@ -1,0 +1,11 @@
+dist
+bin
+lib
+
+node_modules
+
+README.md
+tsconfig.json
+
+CHANGELOG.md
+.yarn

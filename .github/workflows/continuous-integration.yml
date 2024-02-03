@@ -1,0 +1,61 @@
+name: Continuous Integration
+
+on:
+  pull_request:
+
+jobs:
+  Linting:
+    name: Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Project
+        uses: actions/checkout@v4
+      - name: Add problem matcher
+        run: echo "::add-matcher::.github/problemMatchers/eslint.json"
+      - name: Use Node.js v20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+      - name: Install Dependencies
+        run: bun install
+      - name: Run ESLint
+        run: bun run lint
+
+  CodeQL:
+    name: Codequality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: typescript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  Building:
+    name: Compile source code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Project
+        uses: actions/checkout@v4
+      - name: Add problem matcher
+        run: echo "::add-matcher::.github/problemMatchers/tsc.json"
+      - name: Use Node.js v20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+      - name: Install Dependencies
+        run: bun install
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Build Code
+        run: bun run build
+      - name: TypeCheck
+        run: bun run typecheck
